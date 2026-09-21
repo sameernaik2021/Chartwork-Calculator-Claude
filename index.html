@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chartwork Calculator</title>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#eef3f4; --panel:#ffffff; --ink:#12303a; --muted:#5b7580; --line:#c5d5da;
+  --accent:#0e6b7e; --accent-ink:#ffffff; --warn:#a3261f; --warn-bg:#fbe9e7; --ok-bg:#e4f2f0;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1b21; --panel:#14262e; --ink:#e3eef1; --muted:#8fa9b3; --line:#2b434d;
+    --accent:#4cc3d9; --accent-ink:#06222a; --warn:#ff8f86; --warn-bg:#3a1f1d; --ok-bg:#183a3f;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1b21; --panel:#14262e; --ink:#e3eef1; --muted:#8fa9b3; --line:#2b434d;
+  --accent:#4cc3d9; --accent-ink:#06222a; --warn:#ff8f86; --warn-bg:#3a1f1d; --ok-bg:#183a3f;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif;line-height:1.45}
+main{max-width:760px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;margin:8px 0 2px}
+.sub{color:var(--muted);margin:0 0 14px;font-size:.92rem}
+nav{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:12px}
+nav button{flex:0 0 auto;font:inherit;font-size:.9rem;padding:8px 12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;cursor:pointer}
+nav button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+section.tab{display:none}
+section.tab.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:14px}
+.card h2{font-size:1.05rem;margin:0 0 4px}
+.card p.hint{margin:0 0 10px;color:var(--muted);font-size:.85rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+label{display:block;font-size:.82rem;color:var(--muted)}
+input,select{width:100%;font:inherit;font-size:1rem;padding:7px 8px;margin-top:3px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink)}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+fieldset{border:1px solid var(--line);border-radius:6px;margin:0 0 10px;padding:8px 10px 10px}
+legend{font-size:.85rem;padding:0 6px;color:var(--ink)}
+.pos{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.pos label{font-size:.75rem}
+.actions{display:flex;gap:8px;margin-top:12px}
+.actions button{font:inherit;padding:8px 16px;border-radius:6px;border:1px solid var(--accent);cursor:pointer}
+.go{background:var(--accent);color:var(--accent-ink)}
+.rst{background:transparent;color:var(--accent)}
+.result{margin-top:12px;border-radius:6px;background:var(--ok-bg);padding:4px 10px;display:none}
+.result.err{background:var(--warn-bg);color:var(--warn);padding:10px}
+.result.on,.result.err.on{display:block}
+.row{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.row:last-child{border-bottom:0}
+.row span{color:var(--muted)}
+.row b{text-align:right;font-variant-numeric:tabular-nums}
+footer{font-size:.8rem;color:var(--muted);padding:6px 0 20px}
+footer button{font:inherit;font-size:.8rem;background:none;border:1px solid var(--line);color:var(--ink);border-radius:5px;padding:4px 8px;cursor:pointer}
+#test{margin-top:8px;white-space:pre-wrap}
+@media (max-width:480px){.pos{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Chartwork Calculator</h1>
+  <p class="sub">Deck-officer navigation sums: distance-speed-time, sailing, dead reckoning, compass error, current triangles and CPA.</p>
+
+  <nav id="tabs" role="tablist" aria-label="Calculators">
+    <button role="tab" data-tab="t-dst" aria-selected="true">Speed / Distance / Time</button>
+    <button role="tab" data-tab="t-cd" aria-selected="false">Course &amp; Distance</button>
+    <button role="tab" data-tab="t-dr" aria-selected="false">DR Position</button>
+    <button role="tab" data-tab="t-cmp" aria-selected="false">Compass Error</button>
+    <button role="tab" data-tab="t-cur" aria-selected="false">Set &amp; Drift</button>
+    <button role="tab" data-tab="t-cpa" aria-selected="false">CPA / TCPA</button>
+  </nav>
+
+  <section class="tab on" id="t-dst">
+    <div class="card">
+      <h2>Speed, distance, time</h2>
+      <p class="hint">Fill any two values and leave the third empty. Speed in knots, distance in nautical miles.</p>
+      <div class="grid">
+        <label>Speed (kn)<input id="dst_s" type="number" step="any" min="0" inputmode="decimal"></label>
+        <label>Distance (nm)<input id="dst_d" type="number" step="any" min="0" inputmode="decimal"></label>
+        <label>Time (hours)<input id="dst_h" type="number" step="any" min="0" inputmode="decimal"></label>
+        <label>Time (minutes)<input id="dst_m" type="number" step="any" min="0" max="59.99" inputmode="decimal"></label>
+      </div>
+      <div class="actions"><button class="go" data-do="calcDST">Calculate</button><button class="rst">Reset</button></div>
+      <div class="result" id="r_dst" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-cd">
+    <div class="card">
+      <h2>Course and distance between two positions</h2>
+      <p class="hint">Mercator sailing (rhumb line), plane sailing and great-circle initial course. All courses are true.</p>
+      <fieldset><legend>Departure</legend><div class="pos" id="p_cd1"></div></fieldset>
+      <fieldset><legend>Destination</legend><div class="pos" id="p_cd2"></div></fieldset>
+      <label style="max-width:200px">Speed (kn), optional, for ETA<input id="cd_s" type="number" step="any" min="0" inputmode="decimal"></label>
+      <div class="actions"><button class="go" data-do="calcCD">Calculate</button><button class="rst">Reset</button></div>
+      <div class="result" id="r_cd" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-dr">
+    <div class="card">
+      <h2>Dead-reckoning position</h2>
+      <p class="hint">Find the position reached after steaming a true course for a distance (Mercator sailing).</p>
+      <fieldset><legend>Departure</legend><div class="pos" id="p_dr"></div></fieldset>
+      <div class="grid">
+        <label>True course (°)<input id="dr_c" type="number" step="any" min="0" max="360" inputmode="decimal"></label>
+        <label>Distance run (nm)<input id="dr_d" type="number" step="any" min="0" inputmode="decimal"></label>
+      </div>
+      <div class="actions"><button class="go" data-do="calcDR">Calculate</button><button class="rst">Reset</button></div>
+      <div class="result" id="r_dr" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-cmp">
+    <div class="card">
+      <h2>True, magnetic and compass courses</h2>
+      <p class="hint">Convert any one to the other two. Easterly variation or deviation is added going from compass to true.</p>
+      <div class="grid">
+        <label>Direction (°)<input id="cm_dir" type="number" step="any" min="0" max="360" inputmode="decimal"></label>
+        <label>Given as<select id="cm_type"><option value="T">True</option><option value="M">Magnetic</option><option value="C">Compass</option></select></label>
+        <label>Variation (°)<input id="cm_var" type="number" step="any" min="0" max="90" inputmode="decimal"></label>
+        <label>Var. name<select id="cm_varh"><option value="E">East</option><option value="W">West</option></select></label>
+        <label>Deviation (°)<input id="cm_dev" type="number" step="any" min="0" max="90" inputmode="decimal"></label>
+        <label>Dev. name<select id="cm_devh"><option value="E">East</option><option value="W">West</option></select></label>
+      </div>
+      <div class="actions"><button class="go" data-do="calcCMP">Calculate</button><button class="rst">Reset</button></div>
+      <div class="result" id="r_cmp" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-cur">
+    <div class="card">
+      <h2>Course to steer (allow for current)</h2>
+      <p class="hint">Find the heading needed to make good a desired track, and the resulting speed over the ground.</p>
+      <div class="grid">
+        <label>Desired track (°T)<input id="st_track" type="number" step="any" min="0" max="360" inputmode="decimal"></label>
+        <label>Ship speed through water (kn)<input id="st_speed" type="number" step="any" min="0" inputmode="decimal"></label>
+        <label>Set of current (°T)<input id="st_set" type="number" step="any" min="0" max="360" inputmode="decimal"></label>
+        <label>Drift / rate (kn)<input id="st_rate" type="number" step="any" min="0" inputmode="decimal"></label>
+        <label>Distance (nm), optional<input id="st_dist" type="number" step="any" min="0" inputmode="decimal"></label>
+      </div>
+      <div class="actions"><button class="go" data-do="calcSteer">Calculate</button><button class="rst">Reset</button></div>
+      <div class="result" id="r_st" aria-live="polite"></div>
+    </div>
+    <div class="card">
+      <h2>Track made good (resultant of course and current)</h2>
+      <p class="hint">Find the track and speed over the ground from the course steered and the current.</p>
+      <div class="grid">
+        <label>Course steered (°T)<input id="rs_course" type="number" step="any" min="0" max="360" inputmode="decimal"></label>
+        <label>Ship speed (kn)<input id="rs_speed" type="number" step="any" min="0" inputmode="decimal"></label>
+        <label>Set of current (°T)<input id="rs_set" type="number" step="any" min="0" max="360" inputmode="decimal"></label>
+        <label>Drift / rate (kn)<input id="rs_rate" type="number" step="any" min="0" inputmode="decimal"></label>
+      </div>
+      <div class="actions"><button class="go" data-do="calcResultant">Calculate</button><button class="rst">Reset</button></div>
+      <div class="result" id="r_rs" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="tab" id="t-cpa">
+    <div class="card">
+      <h2>Closest point of approach</h2>
+      <p class="hint">Uses true bearing of the target and true courses. Gives CPA and time to CPA.</p>
+      <div class="grid">
+        <label>Own course (°T)<input id="cp_oc" type="number" step="any" min="0" max="360" inputmode="decimal"></label>
+        <label>Own speed (kn)<input id="cp_os" type="number" step="any" min="0" inputmode="decimal"></label>
+        <label>Target bearing (°T)<input id="cp_b" type="number" step="any" min="0" max="360" inputmode="decimal"></label>
+        <label>Target range (nm)<input id="cp_r" type="number" step="any" min="0" inputmode="decimal"></label>
+        <label>Target course (°T)<input id="cp_tc" type="number" step="any" min="0" max="360" inputmode="decimal"></label>
+        <label>Target speed (kn)<input id="cp_ts" type="number" step="any" min="0" inputmode="decimal"></label>
+      </div>
+      <div class="actions"><button class="go" data-do="calcCPA">Calculate</button><button class="rst">Reset</button></div>
+      <div class="result" id="r_cpa" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <footer>
+    Spherical-earth model (1 minute of latitude = 1 nm). For study and checking only; never rely on it as the sole means of navigation.
+    <div><button id="selftest" type="button">Run self-test</button></div>
+    <div id="test" aria-live="polite"></div>
+  </footer>
+</main>
+
+<script>
+"use strict";
+/*CORE*/
+var D2R = Math.PI / 180, R2D = 180 / Math.PI;
+function nd(x) { return ((x + 180) % 360 + 360) % 360 - 180; }   // normalise to [-180,180)
+function nb(x) { return ((x % 360) + 360) % 360; }              // normalise to [0,360)
+function mp(latDeg) { return (10800 / Math.PI) * Math.log(Math.tan(Math.PI / 4 + latDeg * D2R / 2)); } // meridional parts, minutes
+
+function solveDST(s, d, t) {
+  var n = [s, d, t].filter(function (x) { return Number.isNaN(x); }).length;
+  if (n !== 1) throw new Error("Fill exactly two of Speed, Distance and Time, and leave one empty.");
+  if (Number.isNaN(t)) { if (s <= 0) throw new Error("Speed must be above zero to find time."); return { s: s, d: d, t: d / s }; }
+  if (Number.isNaN(d)) return { s: s, d: s * t, t: t };
+  if (t <= 0) throw new Error("Time must be above zero to find speed.");
+  return { s: d / t, d: d, t: t };
+}
+
+function courseDist(a, b) {
+  if (Math.abs(a.lat) > 89 || Math.abs(b.lat) > 89) throw new Error("Latitudes must be within 89° for rhumb-line sailing.");
+  var dlat = (b.lat - a.lat) * 60, dlon = nd(b.lon - a.lon) * 60;
+  if (Math.abs(dlat) < 1e-9 && Math.abs(dlon) < 1e-9) return { same: true };
+  var dmp = mp(b.lat) - mp(a.lat);
+  var cm = Math.atan2(dlon, dmp);
+  var dist = Math.abs(dmp) < 1e-9 ? Math.abs(dlon) * Math.cos(a.lat * D2R) : Math.abs(dlat / Math.cos(cm));
+  var mlat = (a.lat + b.lat) / 2, dep = dlon * Math.cos(mlat * D2R);
+  var p1 = a.lat * D2R, p2 = b.lat * D2R, dl = nd(b.lon - a.lon) * D2R;
+  var h = Math.pow(Math.sin((p2 - p1) / 2), 2) + Math.cos(p1) * Math.cos(p2) * Math.pow(Math.sin(dl / 2), 2);
+  var gcd = 2 * (10800 / Math.PI) * Math.asin(Math.min(1, Math.sqrt(h)));
+  var gcb = Math.atan2(Math.sin(dl) * Math.cos(p2), Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl));
+  return { same: false, dlat: dlat, dlon: dlon, dmp: dmp, merC: nb(cm * R2D), merD: dist,
+           dep: dep, plC: nb(Math.atan2(dep, dlat) * R2D), plD: Math.hypot(dep, dlat),
+           gcC: nb(gcb * R2D), gcD: gcd };
+}
+
+function drPos(p, c, d) {
+  if (Math.abs(p.lat) > 89) throw new Error("Latitude must be within 89°.");
+  var cr = c * D2R, dlatMin = d * Math.cos(cr), lat2 = p.lat + dlatMin / 60;
+  if (Math.abs(lat2) > 89) throw new Error("Resulting latitude is beyond 89°; Mercator sailing does not apply.");
+  var dlonMin = Math.abs(dlatMin) < 1e-9 ? d * Math.sin(cr) / Math.cos(p.lat * D2R)
+                                         : (mp(lat2) - mp(p.lat)) * Math.tan(cr);
+  return { lat: lat2, lon: nd(p.lon + dlonMin / 60), dlat: dlatMin, dlon: dlonMin, dep: d * Math.sin(cr) };
+}
+
+function compassConv(dir, type, vr, dv) { // vr, dv signed: East positive
+  var t, m, c;
+  if (type === "T") { t = dir; m = t - vr; c = m - dv; }
+  else if (type === "M") { m = dir; t = m + vr; c = m - dv; }
+  else { c = dir; m = c + dv; t = m + vr; }
+  return { t: nb(t), m: nb(m), c: nb(c) };
+}
+
+function steer(track, V, setDir, rate) {
+  if (V <= 0) throw new Error("Ship speed must be above zero.");
+  var T = track * D2R, S = setDir * D2R;
+  var tx = Math.sin(T), ty = Math.cos(T), nx = Math.cos(T), ny = -Math.sin(T);
+  var cx = rate * Math.sin(S), cy = rate * Math.cos(S);
+  var p = cx * nx + cy * ny;
+  if (Math.abs(p) > V) throw new Error("Current is too strong: the ship cannot hold that track at this speed.");
+  var a = Math.sqrt(V * V - p * p);
+  var vx = a * tx - p * nx, vy = a * ty - p * ny;
+  var sog = a + (cx * tx + cy * ty);
+  if (sog <= 1e-9) throw new Error("The ship cannot make headway along that track.");
+  var heading = nb(Math.atan2(vx, vy) * R2D);
+  return { heading: heading, sog: sog, wca: nd(heading - track) };
+}
+
+function resultant(course, V, setDir, rate) {
+  var gx = V * Math.sin(course * D2R) + rate * Math.sin(setDir * D2R);
+  var gy = V * Math.cos(course * D2R) + rate * Math.cos(setDir * D2R);
+  var sog = Math.hypot(gx, gy);
+  return { track: sog < 1e-9 ? NaN : nb(Math.atan2(gx, gy) * R2D), sog: sog };
+}
+
+function cpaCalc(oc, os, brg, rng, tc, ts) {
+  var px = rng * Math.sin(brg * D2R), py = rng * Math.cos(brg * D2R);
+  var vrx = ts * Math.sin(tc * D2R) - os * Math.sin(oc * D2R);
+  var vry = ts * Math.cos(tc * D2R) - os * Math.cos(oc * D2R);
+  var v2 = vrx * vrx + vry * vry;
+  if (v2 < 1e-12) return { still: true, cpa: rng };
+  var t = -(px * vrx + py * vry) / v2;
+  var out = { still: false, rs: Math.sqrt(v2), rc: nb(Math.atan2(vrx, vry) * R2D), t: t };
+  if (t <= 0) { out.cpa = rng; out.closing = false; return out; }
+  var cx = px + vrx * t, cy = py + vry * t;
+  out.cpa = Math.hypot(cx, cy); out.closing = true; out.brgCpa = nb(Math.atan2(cx, cy) * R2D);
+  return out;
+}
+
+function selfTest() {
+  var res = [];
+  function eq(name, got, want, tol) { var ok = Math.abs(got - want) <= (tol || 0.01); res.push((ok ? "PASS " : "FAIL ") + name + " (" + got.toFixed(3) + " vs " + want + ")"); return ok; }
+  eq("DST time", solveDST(12, 30, NaN).t, 2.5);
+  eq("DST speed", solveDST(NaN, 30, 2).s, 15);
+  var r = courseDist({ lat: 0, lon: 0 }, { lat: 1, lon: 0 });
+  eq("Due north course", r.merC, 0); eq("Due north dist", r.merD, 60);
+  r = courseDist({ lat: 50, lon: 0 }, { lat: 50, lon: 1 });
+  eq("Parallel course", r.merC, 90); eq("Parallel dist", r.merD, 60 * Math.cos(50 * D2R), 0.001);
+  r = courseDist({ lat: 10, lon: 170 }, { lat: 10, lon: -170 });
+  eq("Date-line crossing dlon", r.dlon, 1200);
+  var d = drPos({ lat: 0, lon: 0 }, 0, 60); eq("DR north lat", d.lat, 1, 1e-6);
+  d = drPos({ lat: 60, lon: 0 }, 90, 60); eq("DR east lon", d.lon, 2, 1e-6);
+  var rt = courseDist({ lat: 30, lon: 10 }, drPos({ lat: 30, lon: 10 }, 137, 250).lat === 0 ? { lat: 0, lon: 0 } : { lat: drPos({ lat: 30, lon: 10 }, 137, 250).lat, lon: drPos({ lat: 30, lon: 10 }, 137, 250).lon });
+  eq("DR round trip course", rt.merC, 137, 0.01); eq("DR round trip dist", rt.merD, 250, 0.01);
+  var c = compassConv(90, "T", -5, 2); eq("Compass M", c.m, 95); eq("Compass C", c.c, 93);
+  c = compassConv(93, "C", -5, 2); eq("Compass to T", c.t, 90);
+  var s = steer(0, 10, 90, 5); eq("Steer heading", s.heading, 330, 0.01); eq("Steer SOG", s.sog, Math.sqrt(75), 0.001);
+  var q = resultant(0, 10, 90, 10); eq("Resultant track", q.track, 45); eq("Resultant SOG", q.sog, Math.sqrt(200), 0.001);
+  var k = cpaCalc(0, 10, 0, 5, 180, 10); eq("CPA head-on", k.cpa, 0, 1e-6); eq("TCPA head-on (h)", k.t, 0.25);
+  k = cpaCalc(0, 10, 90, 5, 0, 10); eq("CPA parallel courses", k.cpa, 5, 1e-6);
+  return res;
+}
+/*END*/
+
+/* ---------- UI ---------- */
+function $(id) { return document.getElementById(id); }
+function val(id) { var v = $(id).value.trim(); return v === "" ? NaN : Number(v); }
+function req(id, name, min, max) {
+  var x = val(id);
+  if (!Number.isFinite(x)) throw new Error(name + " is required.");
+  if (x < min || x > max) throw new Error(name + " must be between " + min + " and " + max + ".");
+  return x;
+}
+function opt(id, name, min, max) { return Number.isNaN(val(id)) ? NaN : req(id, name, min, max); }
+function optZero(id, name, min, max) { var x = opt(id, name, min, max); return Number.isNaN(x) ? 0 : x; }
+
+function buildPos(host, prefix) {
+  $(host).innerHTML =
+    '<label>Lat °<input id="' + prefix + '_latd" type="number" step="any" min="0" max="90" inputmode="decimal"></label>' +
+    '<label>Lat ′<input id="' + prefix + '_latm" type="number" step="any" min="0" max="59.99" inputmode="decimal"></label>' +
+    '<label>N / S<select id="' + prefix + '_lath"><option value="1">N</option><option value="-1">S</option></select></label>' +
+    '<label>Long °<input id="' + prefix + '_lond" type="number" step="any" min="0" max="180" inputmode="decimal"></label>' +
+    '<label>Long ′<input id="' + prefix + '_lonm" type="number" step="any" min="0" max="59.99" inputmode="decimal"></label>' +
+    '<label>E / W<select id="' + prefix + '_lonh"><option value="1">E</option><option value="-1">W</option></select></label>';
+}
+function readPos(prefix, label) {
+  var latd = req(prefix + "_latd", label + " latitude degrees", 0, 90);
+  var latm = optZero(prefix + "_latm", label + " latitude minutes", 0, 59.99);
+  var lond = req(prefix + "_lond", label + " longitude degrees", 0, 180);
+  var lonm = optZero(prefix + "_lonm", label + " longitude minutes", 0, 59.99);
+  var lat = (latd + latm / 60) * Number($(prefix + "_lath").value);
+  var lon = (lond + lonm / 60) * Number($(prefix + "_lonh").value);
+  if (Math.abs(lat) > 90) throw new Error(label + " latitude cannot exceed 90°.");
+  if (Math.abs(lon) > 180) throw new Error(label + " longitude cannot exceed 180°.");
+  return { lat: lat, lon: lon };
+}
+
+function pad(n, w) { var s = String(n); while (s.length < w) s = "0" + s; return s; }
+function fmtPos(v, isLat) {
+  var a = Math.abs(v), tot = Math.round(a * 600) / 10, deg = Math.floor(tot / 60), min = tot - deg * 60;
+  var hemi = isLat ? (v >= 0 ? "N" : "S") : (v >= 0 ? "E" : "W");
+  return pad(deg, isLat ? 2 : 3) + "° " + pad(min.toFixed(1), 4) + "′ " + hemi;
+}
+function fmtBrg(x) { var s = nb(x).toFixed(1); if (s === "360.0") s = "0.0"; return pad(s, 5) + "°"; }
+function fmtMin(v, pos, neg) { return Math.abs(v).toFixed(1) + "′ " + (v >= 0 ? pos : neg); }
+function fmtTime(h) {
+  var tot = Math.round(h * 60), hh = Math.floor(tot / 60), mm = tot % 60;
+  return hh + " h " + pad(mm, 2) + " min";
+}
+
+function rows(id, list) {
+  var el = $(id);
+  el.className = "result on";
+  el.innerHTML = list.map(function (r) { return '<div class="row"><span>' + r[0] + "</span><b>" + r[1] + "</b></div>"; }).join("");
+}
+function fail(id, msg) { var el = $(id); el.className = "result err on"; el.textContent = msg; }
+function run(id, fn) { try { rows(id, fn()); } catch (e) { fail(id, e.message); } }
+
+var handlers = {
+  calcDST: function () {
+    run("r_dst", function () {
+      var s = opt("dst_s", "Speed", 0, 1e6), d = opt("dst_d", "Distance", 0, 1e9);
+      var H = opt("dst_h", "Hours", 0, 1e6), M = opt("dst_m", "Minutes", 0, 59.99);
+      var t = (Number.isNaN(H) && Number.isNaN(M)) ? NaN : (Number.isNaN(H) ? 0 : H) + (Number.isNaN(M) ? 0 : M) / 60;
+      var r = solveDST(s, d, t);
+      return [["Speed", r.s.toFixed(2) + " kn"], ["Distance", r.d.toFixed(2) + " nm"],
+              ["Time", fmtTime(r.t) + " (" + r.t.toFixed(3) + " h)"]];
+    });
+  },
+  calcCD: function () {
+    run("r_cd", function () {
+      var a = readPos("cd1", "Departure"), b = readPos("cd2", "Destination");
+      var sp = opt("cd_s", "Speed", 0, 1e6), r = courseDist(a, b);
+      if (r.same) return [["Result", "Both positions are identical"]];
+      var out = [["D. lat", fmtMin(r.dlat, "N", "S")], ["D. long", fmtMin(r.dlon, "E", "W")],
+                 ["Departure (plane)", r.dep.toFixed(1) + "′"], ["D.M.P.", r.dmp.toFixed(1) + "′"],
+                 ["Mercator course", fmtBrg(r.merC)], ["Mercator distance", r.merD.toFixed(1) + " nm"],
+                 ["Plane sailing course", fmtBrg(r.plC)], ["Plane sailing distance", r.plD.toFixed(1) + " nm"],
+                 ["Great-circle initial course", fmtBrg(r.gcC)], ["Great-circle distance", r.gcD.toFixed(1) + " nm"]];
+      if (Number.isFinite(sp) && sp > 0) out.push(["Steaming time (rhumb line)", fmtTime(r.merD / sp)]);
+      return out;
+    });
+  },
+  calcDR: function () {
+    run("r_dr", function () {
+      var p = readPos("dr", "Departure"), c = req("dr_c", "Course", 0, 360), d = req("dr_d", "Distance", 0, 1e6);
+      var r = drPos(p, c, d);
+      return [["D. lat", fmtMin(r.dlat, "N", "S")], ["D. long", fmtMin(r.dlon, "E", "W")],
+              ["Departure", Math.abs(r.dep).toFixed(1) + "′ " + (r.dep >= 0 ? "E" : "W")],
+              ["Latitude in", fmtPos(r.lat, true)], ["Longitude in", fmtPos(r.lon, false)]];
+    });
+  },
+  calcCMP: function () {
+    run("r_cmp", function () {
+      var dir = req("cm_dir", "Direction", 0, 360);
+      var vr = optZero("cm_var", "Variation", 0, 90) * ($("cm_varh").value === "E" ? 1 : -1);
+      var dv = optZero("cm_dev", "Deviation", 0, 90) * ($("cm_devh").value === "E" ? 1 : -1);
+      var r = compassConv(dir, $("cm_type").value, vr, dv), ce = vr + dv;
+      return [["True", fmtBrg(r.t)], ["Magnetic", fmtBrg(r.m)], ["Compass", fmtBrg(r.c)],
+              ["Compass error", Math.abs(ce).toFixed(1) + "° " + (ce >= 0 ? "E" : "W")]];
+    });
+  },
+  calcSteer: function () {
+    run("r_st", function () {
+      var tr = req("st_track", "Desired track", 0, 360), v = req("st_speed", "Ship speed", 0, 1e4);
+      var se = req("st_set", "Set", 0, 360), ra = req("st_rate", "Drift", 0, 1e4), dist = opt("st_dist", "Distance", 0, 1e9);
+      var r = steer(tr, v, se, ra);
+      var out = [["Course to steer", fmtBrg(r.heading)],
+                 ["Correction", Math.abs(r.wca).toFixed(1) + "° to " + (r.wca >= 0 ? "starboard" : "port") + " of track"],
+                 ["Speed over ground", r.sog.toFixed(2) + " kn"]];
+      if (Number.isFinite(dist)) out.push(["Time for distance", fmtTime(dist / r.sog)]);
+      return out;
+    });
+  },
+  calcResultant: function () {
+    run("r_rs", function () {
+      var c = req("rs_course", "Course", 0, 360), v = req("rs_speed", "Ship speed", 0, 1e4);
+      var se = req("rs_set", "Set", 0, 360), ra = req("rs_rate", "Drift", 0, 1e4);
+      var r = resultant(c, v, se, ra);
+      return [["Track made good", Number.isNaN(r.track) ? "Undefined (no movement)" : fmtBrg(r.track)],
+              ["Speed over ground", r.sog.toFixed(2) + " kn"]];
+    });
+  },
+  calcCPA: function () {
+    run("r_cpa", function () {
+      var oc = req("cp_oc", "Own course", 0, 360), os = req("cp_os", "Own speed", 0, 1e4);
+      var b = req("cp_b", "Target bearing", 0, 360), rg = req("cp_r", "Target range", 0, 1e6);
+      var tc = req("cp_tc", "Target course", 0, 360), ts = req("cp_ts", "Target speed", 0, 1e4);
+      var k = cpaCalc(oc, os, b, rg, tc, ts);
+      if (k.still) return [["Relative motion", "None: range stays at " + rg.toFixed(2) + " nm"]];
+      var out = [["Relative course", fmtBrg(k.rc)], ["Relative speed", k.rs.toFixed(2) + " kn"]];
+      if (k.closing) {
+        out.push(["CPA", k.cpa.toFixed(2) + " nm"], ["Time to CPA", fmtTime(k.t)], ["Bearing of target at CPA", fmtBrg(k.brgCpa)]);
+      } else {
+        out.push(["Situation", "Opening: CPA was " + (Math.abs(k.t) * 60).toFixed(0) + " min ago"], ["Current range", rg.toFixed(2) + " nm"]);
+      }
+      return out;
+    });
+  }
+};
+
+function init() {
+  buildPos("p_cd1", "cd1"); buildPos("p_cd2", "cd2"); buildPos("p_dr", "dr");
+  var tabs = document.querySelectorAll("#tabs button");
+  tabs.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      tabs.forEach(function (b) { b.setAttribute("aria-selected", b === btn ? "true" : "false"); });
+      document.querySelectorAll("section.tab").forEach(function (s) { s.classList.toggle("on", s.id === btn.getAttribute("data-tab")); });
+    });
+  });
+  document.querySelectorAll("button[data-do]").forEach(function (btn) {
+    btn.addEventListener("click", function () { handlers[btn.getAttribute("data-do")](); });
+  });
+  document.querySelectorAll("button.rst").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var card = btn.closest(".card");
+      card.querySelectorAll("input").forEach(function (i) { i.value = ""; });
+      var r = card.querySelector(".result"); r.className = "result"; r.innerHTML = "";
+    });
+  });
+  $("selftest").addEventListener("click", function () {
+    var out = selfTest(), bad = out.filter(function (l) { return l.indexOf("FAIL") === 0; }).length;
+    $("test").textContent = (bad ? bad + " test(s) failed\n" : "All " + out.length + " tests passed\n") + out.join("\n");
+  });
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
+</script>
+</body>
+</html>
